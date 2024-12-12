@@ -17,6 +17,7 @@ class NotificationViewController: UIViewController, UNNotificationContentExtensi
         label.font = UIFont.preferredFont(ofSize: 16)
         label.adjustsFontForContentSizeCategory = true
         label.textAlignment = .center
+		label.alpha = 0
         return label
     }()
 
@@ -32,6 +33,9 @@ class NotificationViewController: UIViewController, UNNotificationContentExtensi
         self.view.addSubview(self.noticeLabel)
         self.view.addSubview(self.imageView)
         self.preferredContentSize = CGSize(width: 0, height: 1)
+		// 启用拖放功能
+		imageView.isUserInteractionEnabled = true
+		imageView.addInteraction(UIDragInteraction(delegate: self))
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -96,11 +100,21 @@ class NotificationViewController: UIViewController, UNNotificationContentExtensi
     }
 
     func showTips(text: String) {
-        /// 调整页面整个大小为image的高度和label的高度总和
-        self.preferredContentSize = CGSize(width: 0, height: self.imageView.frame.height + 40)
-        self.noticeLabel.text = text
-        /// 调整 y的位置，如果复制内容，显示在图片的底部
-        self.noticeLabel.frame = CGRect(x: 0, y: self.imageView.frame.height, width: self.view.bounds.width, height: 40)
+		// 调整页面大小为 image 和 label 高度总和
+		self.preferredContentSize = CGSize(width: self.view.bounds.width, height: 40 + self.imageView.frame.height)
+		/// 设置提示文字
+		self.noticeLabel.text = text
+		// 设置初始位置在视图顶部之外
+		self.noticeLabel.frame = CGRect(x: 0, y: -40, width: self.view.bounds.width, height: 40)
+		/// 调整image的高度在label下面
+		self.imageView.frame = CGRect(x: 0, y: 0, width: self.view.bounds.width, height: self.imageView.frame.height)
+
+		// 动画滑入 noticeLabel
+		UIView.animate(withDuration: 0.5, animations: {
+			self.noticeLabel.frame.origin.y = 0
+			self.imageView.frame.origin.y = self.noticeLabel.frame.height
+			self.noticeLabel.alpha = 1
+		})
     }
 }
 
@@ -125,7 +139,20 @@ extension NotificationViewController {
                 self.preferredContentSize = size
                 self.imageView.image = image
                 self.imageView.frame = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+
             }
         }
     }
+}
+
+
+extension NotificationViewController: UIDragInteractionDelegate {
+	func dragInteraction(_ interaction: UIDragInteraction, itemsForBeginning session: UIDragSession) -> [UIDragItem] {
+		guard let image = imageView.image else { return [] }
+
+		// 创建拖放项目
+		let provider = NSItemProvider(object: image)
+		let item = UIDragItem(itemProvider: provider)
+		return [item]
+	}
 }

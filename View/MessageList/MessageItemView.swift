@@ -40,7 +40,7 @@ class MessageItemView: UIView {
     
     let imageView: UIImageView = {
         let imageView = UIImageView()
-        imageView.contentMode = .scaleAspectFill
+        imageView.contentMode = .scaleAspectFit
         imageView.layer.cornerRadius = 4
         imageView.clipsToBounds = true
         return imageView
@@ -168,10 +168,16 @@ extension MessageItemView {
         self.dateLabel.text = message.dateText
         if let image = message.image {
             imageView.isHidden = false
+            // 图片未缓存时，使用的默认尺寸
+            remakeImageViewConstraints(width: 200, height: 100)
+            // 移除图片查看器
+            imageView.removeImageViewer()
+            
             // loadDiskFileSynchronously
             imageView.kf.setImage(with: URL(string: image), options: [.targetCache(imageCache), .keepCurrentImageWhileLoading, .loadDiskFileSynchronously]) { [weak self] result in
                 guard let self else { return }
                 guard let image = try? result.get().image else {
+                    self.imageView.image = nil
                     return
                 }
                 
@@ -179,12 +185,13 @@ extension MessageItemView {
                 let isDarkMode = UIScreen.main.traitCollection.userInterfaceStyle == .dark
                 var options: [ImageViewerOption] = [
                     .closeIcon(UIImage(named: "back")!),
-                    .theme(isDarkMode ? .dark : .light)
+                    .theme(isDarkMode ? .dark : .light),
+                    .contentMode(.scaleAspectFit)
                 ]
                 if #available(iOS 14.0, *) {
-                    options.append(.rightNavItemTitle(NSLocalizedString("save"), onTap: { _ in
+                    options.append(.rightNavItemTitle(NSLocalizedString("save"), onTap: { [weak self] _ in
                         // 保存 image 到相册
-                        self.saveImageToAlbum(image)
+                        self?.saveImageToAlbum(image)
                     }))
                 }
                 self.imageView.setupImageViewer(options: options)
@@ -193,6 +200,7 @@ extension MessageItemView {
             }
         } else {
             imageView.isHidden = true
+            remakeImageViewConstraints(width: 0, height: 0)
         }
     }
     
@@ -207,6 +215,10 @@ extension MessageItemView {
             height = 400
         }
         
+        remakeImageViewConstraints(width: width, height: height)
+    }
+    
+    func remakeImageViewConstraints(width: CGFloat, height: CGFloat) {
         imageView.snp.remakeConstraints { make in
             make.width.equalTo(width)
             make.height.equalTo(height)
@@ -235,6 +247,21 @@ extension MessageItemView {
                     }
                 }
             }
+        }
+    }
+}
+
+extension UIImageView {
+    func removeImageViewer() {
+        var _tapRecognizer: UIGestureRecognizer?
+        gestureRecognizers?.forEach {
+            // 手势类名是 TapWithDataRecognizer
+            if "\(type(of: $0))" == "TapWithDataRecognizer" {
+                _tapRecognizer = $0
+            }
+        }
+        if let _tapRecognizer {
+            self.removeGestureRecognizer(_tapRecognizer)
         }
     }
 }
